@@ -7,24 +7,27 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(caret)
 ```
 
-## R Markdown
+## Titanic in R
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+This is my submission for the Kaggle titanic competition: <https://www.kaggle.com/c/titanic>. It leverages the caret package in R, and uses many different models that ultimately have their predictions stacked into a final ensemble model. I have had a lot of success using random forests on the Coursera Practical Machine Learning project <https://www.coursera.org/learn/practical-machine-learning>. My hope is that this combined model will perform better than any one of the models individually.
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+### Data Import and Exploration
+The first step is to import the provided training and test data sets.
 
-```{r cars}
-summary(cars)
+```{r import}
+train <- read.csv("../input/train.csv")
+test <- read_csv("../input/test.csv")
+
+dim(train)
+dim(test)
 ```
 
-## Including Plots
+Ideally the training data could be split into a new training set and a cross validation set resuting in a standard split of approximately 75% training and 25% cross validation data. This would allow us to examine the out of sample error on a wide variety of models and parameters before commiting to one of them and running it on the test data. Unfortunately at only 891 rows of data, I have a gut feeling that we will need as much training data as we can get away with. I will not split off a cross validation data set from the training data for this project, and instead utilize caret's buildt in capacity for resampling or k-fold crossvalidation. 
 
-You can also embed plots, for example:
+Ultimately I will submit the model that performs best on the provided test data set. This should work out in the end, because to the best of my knowledge, Kaggle has reserved another 418 rows of data for final model testing. That can be the real test of whether my model overfitted or not. The only downside is that we'll need to wait three years to find out.
 
-```{r pressure, echo=FALSE}
-plot(pressure)
-```
-
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.

@@ -31,3 +31,94 @@ Ideally the training data could be split into a new training set and a cross val
 
 Ultimately I will submit the model that performs best on the provided test data set. This should work out in the end, because to the best of my knowledge, Kaggle has reserved another 418 rows of data for final model testing. That can be the real test of whether my model overfitted or not. The only downside is that we'll need to wait three years to find out.
 
+Before we get ahead of ourselves, we should do some data exploration. We'll need to know what data we are actually working with:
+```{r column_names}
+names(train)
+```
+
+We have a numeric PassengerId column that appears to start at 1 and increase by one sequencially to 891 based on the min, max. and median values. This is the sort of data that appears to mostly matter for book keeping when we go to submit the predictions at the end, and that we shouldn't expect to be useful when training. In the worst case it may play a significant role in classification and lead to overfitting. For these reasons we will exclude it from the training steps.
+
+We know from the competition page that he rest of the data is the following:
+
+
++---------+---------------------------------------------+----------------+
+|Variable |	Definition                                  | Key            |
++=========+=============================================+================+
+|survival | Survival                                    | 0 = No,        |
+|         |                                             | 1 = Yes        |
++---------+---------------------------------------------+----------------+
+|pclass 	| Ticket class                                | 1 = 1st,       |
+|         |                                             | 2 = 2nd,       |
+|         |                                             | 3 = 3rd        |
++---------+---------------------------------------------+----------------+
+|sex 	    | Sex                                         |                |
++---------+---------------------------------------------+----------------+
+|Age 	    | Age in years                                |                |
++---------+---------------------------------------------+----------------+
+|sibsp 	  |num of siblings / spouses aboard the Titanic |                |	
++---------+---------------------------------------------+----------------+
+|parch 	  |num of parents / children aboard the Titanic |	               |
++---------+---------------------------------------------+----------------+
+|ticket 	| Ticket number                               |                |
++---------+---------------------------------------------+----------------+
+|fare 	  | Passenger fare                              |                |
++---------+---------------------------------------------+----------------+
+|cabin 	  | Cabin number                                |                |
++---------+---------------------------------------------+----------------+
+|embarked | Port of Embarkation                         | C = Cherbourg, |
+|         |                                             | Q = Queenstown,|
+|         |                                             | S = Southampton|
++---------+---------------------------------------------+----------------+
+
+**Variable Notes**
+
+**pclass**: A proxy for socio-economic status (SES)
+1st = Upper
+2nd = Middle
+3rd = Lower
+
+**age**: Age is fractional if less than 1. If the age is estimated, is it in the form of xx.5
+
+**sibsp**: The dataset defines family relations in this way...
+Sibling = brother, sister, stepbrother, stepsister
+Spouse = husband, wife (mistresses and fiancés were ignored)
+
+**parch**: The dataset defines family relations in this way...
+Parent = mother, father
+Child = daughter, son, stepdaughter, stepson
+Some children travelled only with a nanny, therefore parch=0 for them.
+
+The first two variables Survived and Pclass are exactly as described, and shouldn't require any further wrangling.
+```{r}
+unique(train$Survived)
+unique(train$Pclass)
+```
+
+```{r}
+summary(train)
+```
+
+We can see fromthe summary table that Sex is strictly male and female, and skews towards males. There doesn't appear to be any missing values, and the data is good the way it is.
+
+```{r}
+ggplot(data = train) + geom_bar(aes(x = Sex)) + ggtitle("Distribution of Gender on the Voyage")
+```
+
+Age is a bit of a different story. There are 177 rows for which age is not available. We will probably need to find a way to impute values for these. Lets see if there is some correlation between age and survival rate:
+```{r}
+ageData <- train
+ageData$AgeBins <- train$Age %>% cut_interval(length = 2.5)
+ggplot(data =  ageData %>% group_by(AgeBins) %>% summarise(meanSurv = mean(Survived))) + geom_col(aes(x = AgeBins, y = meanSurv)) + coord_flip()
+```
+
+We can see that the one eighty year old made it out, making that bar stand out. We also see that young children and early adolescents seem to have done well, and that survival generally decreases with age. Let's break this down by gender:
+```{r}
+ggplot(data =  ageData %>% filter(Sex == "male") %>% group_by(AgeBins) %>% summarise(meanSurv = mean(Survived))) + geom_col(aes(x = AgeBins, y = meanSurv)) + coord_flip() + ggtitle("Survival Rates for Males")
+```
+
+The above pattern is far more striking when we isolate for males. Children did fairly well, but survival rates tend to crash for those above the age of 15. 
+
+```{r}
+ggplot(data =  ageData %>% filter(Sex == "female") %>% group_by(AgeBins) %>% summarise(meanSurv = mean(Survived))) + geom_col(aes(x = AgeBins, y = meanSurv)) + coord_flip() + ggtitle("Survival Rates for Females")
+```
+For women, the trend is essentially non-existant, and the variability overwhelms any signal that might exist in the noise. 

@@ -110,21 +110,29 @@ Age is a bit of a different story. There are 177 rows for which age is not avail
 ```{r}
 ageData <- train
 ageData$AgeBins <- train$Age %>% cut_interval(length = 2.5)
-ggplot(data =  ageData %>% group_by(AgeBins) %>% summarise(meanSurv = mean(Survived))) + geom_col(aes(x = AgeBins, y = meanSurv)) + coord_flip()
+ageData %>% group_by(AgeBins) %>% summarise(meanSurv = mean(Survived)) %>% ggplot() + geom_col(aes(x = AgeBins, y = meanSurv)) + coord_flip()
 ```
 
 We can see that the one eighty year old survived, making that bar stand out. We also see that young children and early adolescents seem to have done well, and that survival generally decreases with age. Let's break this down by gender:
 ```{r}
-ggplot(data =  ageData %>% filter(Sex == "male") %>% group_by(AgeBins) %>% summarise(meanSurv = mean(Survived))) + geom_col(aes(x = AgeBins, y = meanSurv)) + coord_flip() + ggtitle("Survival Rates for Males")
+ageData %>% filter(Sex == "male") %>% group_by(AgeBins) %>% summarise(meanSurv = mean(Survived)) %>% ggplot() + geom_col(aes(x = AgeBins, y = meanSurv)) + coord_flip() + ggtitle("Survival Rates for Males")
 ```
 
 The above pattern is far more striking when we isolate for males. Boys did better, but survival rates tend to crash for those above the age of 15. 
 
 ```{r}
-ggplot(data =  ageData %>% filter(Sex == "female") %>% group_by(AgeBins) %>% summarise(meanSurv = mean(Survived))) + geom_col(aes(x = AgeBins, y = meanSurv)) + coord_flip() + ggtitle("Survival Rates for Females")
+ageData %>% filter(Sex == "female") %>% group_by(AgeBins) %>% summarise(meanSurv = mean(Survived)) %>% ggplot() + geom_col(aes(x = AgeBins, y = meanSurv)) + coord_flip() + ggtitle("Survival Rates for Females")
 ```
 For women, the trend is essentially non-existant, and the variability overwhelms any signal that might exist in the noise.
 
 It's good to know that women and children were indeed were indeed prioritized on the titanic and that wasn't just a line from the movie. This also means we shoud expect age and gender to play major roles in survival later in ou trained models.
+
+Next lets see if there are any relations between the SibSp, Parch, and survival:
+
+```{r}
+train %>% group_by(SibSp, Parch) %>% summarise(meanSurv = mean(Survived)) %>% ggplot() + geom_tile(aes(x = Parch, y = SibSp, fill = meanSurv))
+```
+In general, it looks like the larger the family is, the poorer the survival rate. When Parch is greater or equal to 4, which means people with lots of kids, or possibly multigenerational families, survival seems to be quite low. People who had lots of siblings plus spouses on board also appear to have fared more poorly than smaller families.
+
 
 

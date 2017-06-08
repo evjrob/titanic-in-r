@@ -134,5 +134,21 @@ train %>% group_by(SibSp, Parch) %>% summarise(meanSurv = mean(Survived)) %>% gg
 ```
 In general, it looks like the larger the family is, the poorer the survival rate. When Parch is greater or equal to 4, which means people with lots of kids, or possibly multigenerational families, survival seems to be quite low. People who had lots of siblings plus spouses on board also appear to have fared more poorly than smaller families.
 
+```{r}
+train %>% group_by(SibSp, Parch) %>% summarise(meanSurv = mean(Survived)) %>% ggplot() + geom_tile(aes(x = Parch, y = SibSp, fill = meanSurv))
+```
 
+Next we can look at the survival rate by fare:
 
+```{r}
+fareData <- train
+fareData$FareBins <- train$Fare %>% cut_interval(length = 25)
+fareData %>% group_by(FareBins) %>% summarise(meanSurv = mean(Survived)) %>% ggplot() + geom_col(aes(x = FareBins, y = meanSurv)) + coord_flip()
+```
+
+Generally it appears as though the higher the fare, the better the chances of survival. This is likely because higher fares correlate to cabins and sleeping arrangements closer to the top of the ship.
+
+And now let's look at the survival rate by port of embarkation:
+```{r}
+train %>% group_by(Embarked) %>% summarise(meanSurv = mean(Survived)) %>% filter(Embarked != "") %>% ggplot() + geom_col(aes(x = Embarked, y = meanSurv)) + coord_flip()
+```

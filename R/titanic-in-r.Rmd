@@ -106,22 +106,30 @@ We can see fromthe summary table that Sex is strictly male and female, and skews
 ggplot(data = train) + geom_bar(aes(x = Sex)) + ggtitle("Distribution of Gender on the Voyage")
 ```
 
-Age is a bit of a different story. There are 177 rows for which age is not available. We will probably need to find a way to impute values for these. Lets see if there is some correlation between age and survival rate:
+Age is a bit of a different story. There are 177 rows for which age is not available. We will probably need to find a way to impute values for these. 
+
 ```{r}
 ageData <- train
 ageData$AgeBins <- train$Age %>% cut_interval(length = 2.5)
-ageData %>% group_by(AgeBins) %>% summarise(meanSurv = mean(Survived)) %>% ggplot() + geom_col(aes(x = AgeBins, y = meanSurv)) + coord_flip()
+ageData %>% group_by(AgeBins) %>% summarise(count = n()) %>% ggplot() + geom_col(aes(x = AgeBins, y = count)) + coord_flip() + ggtitle("Count of Passengers by Age")
+```
+
+The spread of ages appears to be almost normally distributed around the age of 30. Due to the reatively low counts of passengers at the younger and older ages, we should expect more variability in survival rates and be less surprised when they differ from other age groups.
+
+Now lets see if there is some correlation between age and survival rate:
+```{r}
+ageData %>% group_by(AgeBins) %>% summarise(meanSurv = mean(Survived)) %>% ggplot() + geom_col(aes(x = AgeBins, y = meanSurv)) + coord_flip() + ggtitle("Mean Survival Rate by Age")
 ```
 
 We can see that the one eighty year old survived, making that bar stand out. We also see that young children and early adolescents seem to have done well, and that survival generally decreases with age. Let's break this down by gender:
 ```{r}
-ageData %>% filter(Sex == "male") %>% group_by(AgeBins) %>% summarise(meanSurv = mean(Survived)) %>% ggplot() + geom_col(aes(x = AgeBins, y = meanSurv)) + coord_flip() + ggtitle("Survival Rates for Males")
+ageData %>% filter(Sex == "male") %>% group_by(AgeBins) %>% summarise(meanSurv = mean(Survived)) %>% ggplot() + geom_col(aes(x = AgeBins, y = meanSurv)) + coord_flip() + ggtitle("Survival Rates for Males by Age")
 ```
 
 The above pattern is far more striking when we isolate for males. Boys did better, but survival rates tend to crash for those above the age of 15. 
 
 ```{r}
-ageData %>% filter(Sex == "female") %>% group_by(AgeBins) %>% summarise(meanSurv = mean(Survived)) %>% ggplot() + geom_col(aes(x = AgeBins, y = meanSurv)) + coord_flip() + ggtitle("Survival Rates for Females")
+ageData %>% filter(Sex == "female") %>% group_by(AgeBins) %>% summarise(meanSurv = mean(Survived)) %>% ggplot() + geom_col(aes(x = AgeBins, y = meanSurv)) + coord_flip() + ggtitle("Survival Rates for Females by Age")
 ```
 For women, the trend is essentially non-existant, and the variability overwhelms any signal that might exist in the noise.
 
@@ -143,12 +151,22 @@ Next we can look at the survival rate by fare:
 ```{r}
 fareData <- train
 fareData$FareBins <- train$Fare %>% cut_interval(length = 25)
-fareData %>% group_by(FareBins) %>% summarise(meanSurv = mean(Survived)) %>% ggplot() + geom_col(aes(x = FareBins, y = meanSurv)) + coord_flip()
+fareData %>% group_by(FareBins) %>% summarise(meanSurv = mean(Survived)) %>% ggplot() + geom_col(aes(x = FareBins, y = meanSurv)) + coord_flip() + ggtitle("Survival Rate by Fare")
 ```
 
 Generally it appears as though the higher the fare, the better the chances of survival. This is likely because higher fares correlate to cabins and sleeping arrangements closer to the top of the ship.
 
+```{r}
+fareData %>% group_by(FareBins) %>% summarise(count = n()) %>% ggplot() + geom_col(aes(x = FareBins, y = count)) + coord_flip() + ggtitle("Count of Passengers by Fare")
+```
+
+It's also true that there are far more low fares than higher ones. This could mean that the people with the lowest fares occupied smaller and more densely packed cabins. If this is the case, that could also negatively affect survival as there would be more people clamouring to get to safety in the corridors where these smaller cheaper cabins are situated. 
+
 And now let's look at the survival rate by port of embarkation:
 ```{r}
-train %>% group_by(Embarked) %>% summarise(meanSurv = mean(Survived)) %>% filter(Embarked != "") %>% ggplot() + geom_col(aes(x = Embarked, y = meanSurv)) + coord_flip()
+train %>% group_by(Embarked) %>% summarise(meanSurv = mean(Survived)) %>% filter(Embarked != "") %>% ggplot() + geom_col(aes(x = Embarked, y = meanSurv)) + coord_flip() + ggtitle("Survival Rate by Port of Embarkation")
 ```
+
+There seems to be slightly higher survival of passengers who embarked at Cherbourg. I'm not sure why this might be the case, and it may not even be a significant difference.
+
+Overall, it appears there will be lots of correlations between survival and the other elements of the data for the machine learning algorithms to use when making predictions. Even so, the next steps will be to clean up the existing features and create some new ones that might help improve them further.

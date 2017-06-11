@@ -9,6 +9,7 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 
 library(tidyverse)
+library(stringr)
 library(caret)
 ```
 
@@ -43,7 +44,7 @@ We know from the competition page that he rest of the data is the following:
 
 +---------+----------------------------------------------+----------------+
 |Variable |	Definition                                   | Key            |
-+=========+=============================================++================+
++=========+==============================================+================+
 |survival | Survival                                     | 0 = No,        |
 |         |                                              | 1 = Yes        |
 +---------+----------------------------------------------+----------------+
@@ -170,3 +171,58 @@ train %>% group_by(Embarked) %>% summarise(meanSurv = mean(Survived)) %>% filter
 There seems to be slightly higher survival of passengers who embarked at Cherbourg. I'm not sure why this might be the case, and it may not even be a significant difference.
 
 Overall, it appears there will be lots of correlations between survival and the other elements of the data for the machine learning algorithms to use when making predictions. Even so, the next steps will be to clean up the existing features and create some new ones that might help improve them further.
+
+### Data Cleaning and Feature Engineering
+
+The first feature that jumped out at me for creation when exploring the data is a person's title. We can see from the names that there are far more than just Miss., Mrs. and Mr.:
+
+```{r}
+# The following regex extracts the text between ", " or ", the " and ". "
+titles <- str_extract_all(train$Name, "((, )|(, the )).{2,10}(\\. )")
+titles <- str_sub(titles, 3, str_length(titles) - 1)
+
+as_tibble(titles) %>% count(value)
+```
+
+Most of them are pretty uncommon however, with only "Master."", "Miss."", "Mr."", and "Mrs."" accounting for more than 10 indviduals each. This means we should probably find a way to group these titles. For this analysis I will use the following:
+
+```{r}
+simplify_titles <- function(data) {
+  
+  simple_titles <- tribble(
+    ~raw_title, ~title,
+    "Capt.", "Ranked",
+    "Col.", "Ranked",
+    "Don.", "Nobility",
+    "Dr.", "Professional",
+    "Jonkheer.", "Nobility",
+    "Lady.", "Nobility",
+    "Major.", "Ranked",
+    "Master.", "Professional",
+    "Miss.", "Miss",
+    "Mlle.", "Miss",
+    "Mme.", "Mrs",
+    "Mr.", "Mr",
+    "Mrs.", "Mrs",
+    "Ms.", "Miss",
+    "Rev.", "Professional",
+    "Sir.", "Nobility",
+    "the Countess.", "Nobility"
+  )
+  
+  return(data %>% left_join(simple_titles))
+}
+```
+
+We will wrap the above transformations into a function that can be applied consistently to any data.
+
+```{r}
+create_titles <- function(data) {
+  # The following regex extracts the text between ", " or ", the " and ". "
+  data <- data %>% transform(raw_title = str_extract(Name, "((, )|(, the )).{2,10}(\\. )")) %>% 
+    transform(raw_title = str_sub(raw_title, 3, str_length(raw_title) - 1)) %>% simplify_titles() %>% select(-raw_title)
+
+  return(data)
+}
+```
+

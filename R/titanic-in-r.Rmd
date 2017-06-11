@@ -349,3 +349,28 @@ create_categorical_pclass <- function(data) {
   return(data)
 }
 ```
+
+That should so it for the manual preprocessing and feature creation steps I had in mind. We should wrap up all of the above functions into a larger function so that we know they were applied consistently to the different datasets.
+```{r}
+engineer_features <- function(data) {
+  data <- data %>% create_titles() %>% create_ticket_prefixes() %>% create_cabin_letters() %>% 
+    create_family_size() %>% create_travelled_alone() %>% create_categorical_pclass()
+  
+  return(data)
+}
+
+names(engineer_features(train))
+```
+
+Next we will drop the feature columns when we have already processed them into more useful features, or when they appear as though they will contribute to overfitting:
+```{r}
+drop_features <- function(data) {
+  data <- data %>% select(-c(PassengerId, Name, Ticket, Cabin))
+  
+  return(data)
+}
+
+names(drop_features(engineer_features(train)))
+```
+
+

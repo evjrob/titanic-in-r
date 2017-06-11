@@ -305,3 +305,23 @@ create_ticket_prefixes <- function(data) {
 }
 ```
 
+
+Now we can find a way to extract some meaningful information from the Cabin variable:
+```{r}
+train %>% count(Cabin)
+```
+
+We can see that for most people no Cabin data is available. For the rest it seems like most cabins are simply a letter followed by a number, but there are some exceptions. There are several individuals who appear to have multiple cabins:
+```{r}
+train$Cabin[train$Cabin %>% str_detect(" ")] %>% unique()
+```
+
+Generally it appears as though the cabin letters are all the same for these individuals, and that for the exceptions "F G73", "F E69", and "F G63", there is only one cabin that has numbers following it. I will therefore extract only the cabin letter comming from the first cabin that has a number following it. All NA cabins will be converted to "Unknown". 
+```{r}
+create_cabin_letters <- function(data) {
+  data <- data %>% transform(cabin_letter = str_extract(data$Cabin, "[A-Z]\\d{1,3}") %>% str_extract("[A-Z]") %>% str_replace_na(replacement = "Unknown"))
+  
+  return(data)
+}
+```
+

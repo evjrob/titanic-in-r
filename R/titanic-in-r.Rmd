@@ -340,3 +340,12 @@ create_travelled_alone <- function(data) {
 }
 ```
 
+Next we will make sure that the Pclass variable is treated as a categorical variable instead of a continuous one:
+```{r}
+create_categorical_pclass <- function(data) {
+  data$Pclass <- factor(data$Pclass)
+  levels(data$Pclass) <- c("first", "second", "third")
+  
+  return(data)
+}
+```

@@ -325,3 +325,18 @@ create_cabin_letters <- function(data) {
 }
 ```
 
+Now lets add some complementary features to the known family variables SibSp and Parch:
+```{r}
+create_family_size <- function(data) {
+  data <- data %>% transform(family_size = SibSp + Parch)
+  
+  return(data)
+}
+
+create_travelled_alone <- function(data) {
+  data <- data %>% transform(travelled_alone = (SibSp + Parch) == 0)
+  
+  return(data)
+}
+```
+

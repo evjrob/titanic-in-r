@@ -226,3 +226,82 @@ create_titles <- function(data) {
 }
 ```
 
+The next steps are to extract meaningful information from the ticket data. It looks to me like when the ticket is not just a number, it has some prefix on the front separated by a space from the numerical part of the ticket:
+```{r}
+ticket_components <- train$Ticket %>% str_split(" ")
+head(ticket_components)
+```
+
+This means we can extract the prefix using the following regex:
+```{r}
+head(train$Ticket %>% str_extract("^.+\\s")) %>% str_trim()
+```
+
+There are a lot of ticket prefixes that appear to mean the same thing even though they are not exactly the same:
+```{r}
+train$Ticket %>% str_extract("^.+\\s") %>% str_trim() %>% as_tibble() %>% count(value)
+```
+
+These differences between ticket prefixes are more complex than they first appear. Originally I just thought to replace all the periods and forward slashes with nothing, as that will reduce all of the prefixes such as "A/4", "A/4.", and "A4." to "A4" and successfully unify them into a single category. Unfortunately this also seems to differentiate legitimately separated prefixes such as "S.C/A.4." from "SC" or "A4" and "C.A./SOTON" from "C.A." and other rows containing "SOTON". This possibility for a ticket to have multiple prefixes suggests that we will need to take a more nuanced approach. Instead I will create a function that identifies if a prefix contains the following key values within it: A4, A5, AH, CA, FC, PC, PP, SC, SOC, SOP, SOTON, SP, SW, O2, OQ, WC, and WEP.
+
+```{r}
+create_ticket_prefixes <- function(data) {
+  data <- data %>% transform(ticket_prefix = str_extract(data$Ticket, "^.+\\s") %>% str_trim() %>% str_replace_all("(\\.)|/", "") %>% str_replace_na())
+  
+  #A4
+  data <- data %>% transform(ticket_A4 = str_detect(data$ticket_prefix, "A4"))  
+  
+  #A5
+  data <- data %>% transform(ticket_A5 = str_detect(data$ticket_prefix, "A5"))
+  
+  #AH
+  data <- data %>% transform(ticket_AH = str_detect(data$ticket_prefix, "AH"))
+  
+  #CA
+  data <- data %>% transform(ticket_CA = str_detect(data$ticket_prefix, "CA"))
+  
+  #FC
+  data <- data %>% transform(ticket_FC = str_detect(data$ticket_prefix, "FC"))
+  
+  #PC
+  data <- data %>% transform(ticket_PC = str_detect(data$ticket_prefix, "PC"))
+  
+  #PP
+  data <- data %>% transform(ticket_PP = str_detect(data$ticket_prefix, "PP"))
+  
+  #SC
+  data <- data %>% transform(ticket_SC = str_detect(data$ticket_prefix, "SC"))
+  
+  #SOC
+  data <- data %>% transform(ticket_SOC = str_detect(data$ticket_prefix, "SOC"))
+  
+  #SOP
+  data <- data %>% transform(ticket_SOP = str_detect(data$ticket_prefix, "SOP"))
+  
+  #SOTON
+  data <- data %>% transform(ticket_SOTON = str_detect(data$ticket_prefix, "(SOTON|STON)"))
+  
+  #SP
+  data <- data %>% transform(ticket_SP = str_detect(data$ticket_prefix, "SP"))
+  
+  #SW
+  data <- data %>% transform(ticket_SW = str_detect(data$ticket_prefix, "SW"))
+  
+  #O2
+  data <- data %>% transform(ticket_O2 = str_detect(data$ticket_prefix, "O2"))
+  
+  #OQ
+  data <- data %>% transform(ticket_OQ = str_detect(data$ticket_prefix, "OQ"))
+  
+  #WC
+  data <- data %>% transform(ticket_WC = str_detect(data$ticket_prefix, "WC"))
+  
+  #WEP
+  data <- data %>% transform(ticket_WEP = str_detect(data$ticket_prefix, "WEP"))
+  
+  data <- data %>% select(-ticket_prefix)
+  
+  return(data)
+}
+```
+

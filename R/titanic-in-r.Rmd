@@ -21,11 +21,11 @@ This is my submission for the Kaggle titanic competition: <https://www.kaggle.co
 The first step is to import the provided training and test data sets.
 
 ```{r import}
-train <- read.csv("../input/train.csv")
-test <- read_csv("../input/test.csv")
+training <- read.csv("../input/train.csv")
+testing <- read_csv("../input/test.csv")
 
-dim(train)
-dim(test)
+dim(training)
+dim(testing)
 ```
 
 Ideally the training data could be split into a new training set and a cross validation set resuting in a standard split of approximately 75% training and 25% cross validation data. This would allow us to examine the out of sample error on a wide variety of models and parameters before commiting to one of them and running it on the test data. Unfortunately at only 891 rows of data, I have a gut feeling that we will need as much training data as we can get away with. I will not split off a cross validation data set from the training data for this project, and instead utilize caret's buildt in capacity for resampling or k-fold crossvalidation. 
@@ -34,7 +34,7 @@ Ultimately I will submit the model that performs best on the provided test data 
 
 Before we get ahead of ourselves, we should do some data exploration. We'll need to know what data we are actually working with:
 ```{r column_names}
-names(train)
+names(training)
 ```
 
 We have a numeric PassengerId column that appears to start at 1 and increase by one sequencially to 891 based on the min, max. and median values. This is the sort of data that appears to mostly matter for book keeping when we go to submit the predictions at the end, and that we shouldn't expect to be useful when training. In the worst case it may play a significant role in classification and lead to overfitting. For these reasons we will exclude it from the training steps.
@@ -91,28 +91,28 @@ Some children travelled only with a nanny, therefore parch=0 for them.
 
 The first two variables Survived and Pclass are exactly as described.
 ```{r}
-unique(train$Survived)
-unique(train$Pclass)
+unique(training$Survived)
+unique(training$Pclass)
 ```
 We know from above that Pclass is a categorical variable where the values are first, second, and third class. There are no other possible values. Because Pclass is categorical we can convert it into three separate dummy variable columns later during preprocessing. 
 
 
 ```{r}
-summary(train)
+summary(training)
 ```
 
 We can see fromthe summary table that Sex is strictly male and female, and skews towards males. There doesn't appear to be any missing values, and the data is good the way it is.
 
 ```{r}
-ggplot(data = train) + geom_bar(aes(x = Sex)) + ggtitle("Distribution of Gender on the Voyage")
+ggplot(data = training) + geom_bar(aes(x = Sex)) + ggtitle("Distribution of Gender on the Voyage")
 ```
 
 Age is a bit of a different story. There are 177 rows for which age is not available. We will probably need to find a way to impute values for these. 
 
 ```{r}
-ageData <- train
-ageData$AgeBins <- train$Age %>% cut_interval(length = 2.5)
-ageData %>% group_by(AgeBins) %>% summarise(count = n()) %>% ggplot() + geom_col(aes(x = AgeBins, y = count)) + coord_flip() + ggtitle("Count of Passengers by Age")
+ageData <- training
+ageData$AgeBins <- ageData$Age %>% cut_interval(length = 2.5)
+ageData %>% group_by(AgeBins) %>% ggplot() + geom_bar(aes(x = AgeBins)) + coord_flip() + ggtitle("Count of Passengers by Age")
 ```
 
 The spread of ages appears to be almost normally distributed around the age of 30. Due to the reatively low counts of passengers at the younger and older ages, we should expect more variability in survival rates and be less surprised when they differ from other age groups.
@@ -139,19 +139,19 @@ It's good to know that women and children were indeed were indeed prioritized on
 Next lets see if there are any relations between the SibSp, Parch, and survival:
 
 ```{r}
-train %>% group_by(SibSp, Parch) %>% summarise(meanSurv = mean(Survived)) %>% ggplot() + geom_tile(aes(x = Parch, y = SibSp, fill = meanSurv))
+training %>% group_by(SibSp, Parch) %>% summarise(meanSurv = mean(Survived)) %>% ggplot() + geom_tile(aes(x = Parch, y = SibSp, fill = meanSurv))
 ```
 In general, it looks like the larger the family is, the poorer the survival rate. When Parch is greater or equal to 4, which means people with lots of kids, or possibly multigenerational families, survival seems to be quite low. People who had lots of siblings plus spouses on board also appear to have fared more poorly than smaller families.
 
 ```{r}
-train %>% group_by(SibSp, Parch) %>% summarise(meanSurv = mean(Survived)) %>% ggplot() + geom_tile(aes(x = Parch, y = SibSp, fill = meanSurv))
+training %>% group_by(SibSp, Parch) %>% summarise(meanSurv = mean(Survived)) %>% ggplot() + geom_tile(aes(x = Parch, y = SibSp, fill = meanSurv))
 ```
 
 Next we can look at the survival rate by fare:
 
 ```{r}
-fareData <- train
-fareData$FareBins <- train$Fare %>% cut_interval(length = 25)
+fareData <- training
+fareData$FareBins <- training$Fare %>% cut_interval(length = 25)
 fareData %>% group_by(FareBins) %>% summarise(meanSurv = mean(Survived)) %>% ggplot() + geom_col(aes(x = FareBins, y = meanSurv)) + coord_flip() + ggtitle("Survival Rate by Fare")
 ```
 
@@ -165,7 +165,7 @@ It's also true that there are far more low fares than higher ones. This could me
 
 And now let's look at the survival rate by port of embarkation:
 ```{r}
-train %>% group_by(Embarked) %>% summarise(meanSurv = mean(Survived)) %>% filter(Embarked != "") %>% ggplot() + geom_col(aes(x = Embarked, y = meanSurv)) + coord_flip() + ggtitle("Survival Rate by Port of Embarkation")
+training %>% group_by(Embarked) %>% summarise(meanSurv = mean(Survived)) %>% filter(Embarked != "") %>% ggplot() + geom_col(aes(x = Embarked, y = meanSurv)) + coord_flip() + ggtitle("Survival Rate by Port of Embarkation")
 ```
 
 There seems to be slightly higher survival of passengers who embarked at Cherbourg. I'm not sure why this might be the case, and it may not even be a significant difference.
@@ -178,7 +178,7 @@ The first feature that jumped out at me for creation when exploring the data is 
 
 ```{r}
 # The following regex extracts the text between ", " or ", the " and ". "
-titles <- str_extract_all(train$Name, "((, )|(, the )).{2,10}(\\. )")
+titles <- str_extract_all(training$Name, "((, )|(, the )).{2,10}(\\. )")
 titles <- str_sub(titles, 3, str_length(titles) - 1)
 
 as_tibble(titles) %>% count(value)
@@ -228,18 +228,18 @@ create_titles <- function(data) {
 
 The next steps are to extract meaningful information from the ticket data. It looks to me like when the ticket is not just a number, it has some prefix on the front separated by a space from the numerical part of the ticket:
 ```{r}
-ticket_components <- train$Ticket %>% str_split(" ")
+ticket_components <- training$Ticket %>% str_split(" ")
 head(ticket_components)
 ```
 
 This means we can extract the prefix using the following regex:
 ```{r}
-head(train$Ticket %>% str_extract("^.+\\s")) %>% str_trim()
+head(training$Ticket %>% str_extract("^.+\\s")) %>% str_trim()
 ```
 
 There are a lot of ticket prefixes that appear to mean the same thing even though they are not exactly the same:
 ```{r}
-train$Ticket %>% str_extract("^.+\\s") %>% str_trim() %>% as_tibble() %>% count(value)
+training$Ticket %>% str_extract("^.+\\s") %>% str_trim() %>% as_tibble() %>% count(value)
 ```
 
 These differences between ticket prefixes are more complex than they first appear. Originally I just thought to replace all the periods and forward slashes with nothing, as that will reduce all of the prefixes such as "A/4", "A/4.", and "A4." to "A4" and successfully unify them into a single category. Unfortunately this also seems to differentiate legitimately separated prefixes such as "S.C/A.4." from "SC" or "A4" and "C.A./SOTON" from "C.A." and other rows containing "SOTON". This possibility for a ticket to have multiple prefixes suggests that we will need to take a more nuanced approach. Instead I will create a function that identifies if a prefix contains the following key values within it: A4, A5, AH, CA, FC, PC, PP, SC, SOC, SOP, SOTON, SP, SW, O2, OQ, WC, and WEP.
@@ -249,55 +249,55 @@ create_ticket_prefixes <- function(data) {
   data <- data %>% transform(ticket_prefix = str_extract(data$Ticket, "^.+\\s") %>% str_trim() %>% str_replace_all("(\\.)|/", "") %>% str_replace_na())
   
   #A4
-  data <- data %>% transform(ticket_A4 = str_detect(data$ticket_prefix, "A4"))  
+  data <- data %>% transform(ticket_A4 = factor(str_detect(data$ticket_prefix, "A4")))  
   
   #A5
-  data <- data %>% transform(ticket_A5 = str_detect(data$ticket_prefix, "A5"))
+  data <- data %>% transform(ticket_A5 = factor(str_detect(data$ticket_prefix, "A5")))
   
   #AH
-  data <- data %>% transform(ticket_AH = str_detect(data$ticket_prefix, "AH"))
+  data <- data %>% transform(ticket_AH = factor(str_detect(data$ticket_prefix, "AH")))
   
   #CA
-  data <- data %>% transform(ticket_CA = str_detect(data$ticket_prefix, "CA"))
+  data <- data %>% transform(ticket_CA = factor(str_detect(data$ticket_prefix, "CA")))
   
   #FC
-  data <- data %>% transform(ticket_FC = str_detect(data$ticket_prefix, "FC"))
+  data <- data %>% transform(ticket_FC = factor(str_detect(data$ticket_prefix, "FC")))
   
   #PC
-  data <- data %>% transform(ticket_PC = str_detect(data$ticket_prefix, "PC"))
+  data <- data %>% transform(ticket_PC = factor(str_detect(data$ticket_prefix, "PC")))
   
   #PP
-  data <- data %>% transform(ticket_PP = str_detect(data$ticket_prefix, "PP"))
+  data <- data %>% transform(ticket_PP = factor(str_detect(data$ticket_prefix, "PP")))
   
   #SC
-  data <- data %>% transform(ticket_SC = str_detect(data$ticket_prefix, "SC"))
+  data <- data %>% transform(ticket_SC = factor(str_detect(data$ticket_prefix, "SC")))
   
   #SOC
-  data <- data %>% transform(ticket_SOC = str_detect(data$ticket_prefix, "SOC"))
+  data <- data %>% transform(ticket_SOC = factor(str_detect(data$ticket_prefix, "SOC")))
   
   #SOP
-  data <- data %>% transform(ticket_SOP = str_detect(data$ticket_prefix, "SOP"))
+  data <- data %>% transform(ticket_SOP = factor(str_detect(data$ticket_prefix, "SOP")))
   
   #SOTON
-  data <- data %>% transform(ticket_SOTON = str_detect(data$ticket_prefix, "(SOTON|STON)"))
+  data <- data %>% transform(ticket_SOTON = factor(str_detect(data$ticket_prefix, "(SOTON|STON)")))
   
   #SP
-  data <- data %>% transform(ticket_SP = str_detect(data$ticket_prefix, "SP"))
+  data <- data %>% transform(ticket_SP = factor(str_detect(data$ticket_prefix, "SP")))
   
   #SW
-  data <- data %>% transform(ticket_SW = str_detect(data$ticket_prefix, "SW"))
+  data <- data %>% transform(ticket_SW = factor(str_detect(data$ticket_prefix, "SW")))
   
   #O2
-  data <- data %>% transform(ticket_O2 = str_detect(data$ticket_prefix, "O2"))
+  data <- data %>% transform(ticket_O2 = factor(str_detect(data$ticket_prefix, "O2")))
   
   #OQ
-  data <- data %>% transform(ticket_OQ = str_detect(data$ticket_prefix, "OQ"))
+  data <- data %>% transform(ticket_OQ = factor(str_detect(data$ticket_prefix, "OQ")))
   
   #WC
-  data <- data %>% transform(ticket_WC = str_detect(data$ticket_prefix, "WC"))
+  data <- data %>% transform(ticket_WC = factor(str_detect(data$ticket_prefix, "WC")))
   
   #WEP
-  data <- data %>% transform(ticket_WEP = str_detect(data$ticket_prefix, "WEP"))
+  data <- data %>% transform(ticket_WEP = factor(str_detect(data$ticket_prefix, "WEP")))
   
   data <- data %>% select(-ticket_prefix)
   
@@ -308,12 +308,12 @@ create_ticket_prefixes <- function(data) {
 
 Now we can find a way to extract some meaningful information from the Cabin variable:
 ```{r}
-train %>% count(Cabin)
+training %>% count(Cabin)
 ```
 
 We can see that for most people no Cabin data is available. For the rest it seems like most cabins are simply a letter followed by a number, but there are some exceptions. There are several individuals who appear to have multiple cabins:
 ```{r}
-train$Cabin[train$Cabin %>% str_detect(" ")] %>% unique()
+training$Cabin[training$Cabin %>% str_detect(" ")] %>% unique()
 ```
 
 Generally it appears as though the cabin letters are all the same for these individuals, and that for the exceptions "F G73", "F E69", and "F G63", there is only one cabin that has numbers following it. I will therefore extract only the cabin letter comming from the first cabin that has a number following it. All NA cabins will be converted to "Unknown". 
@@ -359,7 +359,7 @@ engineer_features <- function(data) {
   return(data)
 }
 
-names(engineer_features(train))
+names(engineer_features(training))
 ```
 
 Next we will drop the feature columns when we have already processed them into more useful features, or when they appear as though they will contribute to overfitting:
@@ -370,7 +370,127 @@ drop_features <- function(data) {
   return(data)
 }
 
-names(drop_features(engineer_features(train)))
+names(drop_features(engineer_features(training)))
 ```
 
+I have ignored a lot of other common preprocessing steps while cleaning the data and engineering additional features. This is because the caret package takes care of a lot of the necessary preprocessing steps such as dummy variable creation, scaling, centering, and principal components analysis.
 
+###Model Training
+
+We will start by applying the previous data cleaning and feature engineering steps to the training and test data sets.
+```{r}
+clean_training <- drop_features(engineer_features(training))
+clean_training$Survived <- factor(clean_training$Survived) # Convert Survied to a factor so that the predictions are discrete.
+clean_testing <- drop_features(engineer_features(testing))
+```
+
+Random Forest:
+```{r, echo = FALSE}
+set.seed(763622)
+
+rf_model <- train(Survived ~ ., method = "rf", preProcess = c("knnImpute"), data = clean_training, na.action = na.pass)
+```
+
+Gradient Boosting:
+```{r, echo = FALSE}
+set.seed(503878)
+
+gbm_model <- train(Survived ~ ., method = "gbm", preProcess = c("knnImpute"), data = clean_training, na.action = na.pass)
+```
+
+SVM Linear with Class Weights:
+```{r, echo = FALSE}
+set.seed(248369)
+
+svmlinear_model <- train(Survived ~ ., method = "svmLinearWeights", preProcess = c("knnImpute", "scale", "center"), data = clean_training, na.action = na.pass)
+```
+
+SVM Radial with Class Weights:
+```{r, echo = FALSE}
+set.seed(227837)
+
+svmradial_model <- train(Survived ~ ., method = "svmRadialWeights", preProcess = c("knnImpute", "scale", "center"), data = clean_training, na.action = na.pass)
+```
+
+Logistic Regression:
+```{r, echo = FALSE}
+set.seed(77168)
+
+logit_model <- train(Survived ~ ., method = "LogitBoost", preProcess = c("knnImpute", "scale", "center"), data = clean_training, na.action = na.pass)
+```
+
+Linear Discriminant Analysis:
+```{r, echo = FALSE}
+set.seed(304699)
+
+lda_model <- train(Survived ~ ., method = "lda", preProcess = c("knnImpute", "scale", "center"), data = clean_training, na.action = na.pass)
+```
+
+Bagged AdaBoost:
+```{r, echo = FALSE}
+set.seed(451039)
+
+adabag_model <- train(Survived ~ ., method = "AdaBag", preProcess = c("knnImpute", "scale", "center"), data = clean_training, na.action = na.pass)
+```
+
+Generalized Additive Model:
+```{r, echo = FALSE}
+set.seed(832176)
+
+gam_model <- train(Survived ~ ., method = "gam", preProcess = c("knnImpute", "scale", "center"), data = clean_training, na.action = na.pass)
+```
+
+Tree Models from Genetic Algorithms:
+```{r, echo = FALSE}
+set.seed(810148)
+
+evtree_model <- train(Survived ~ ., method = "evtree", preProcess = c("knnImpute", "scale", "center"), data = clean_training, na.action = na.pass)
+```
+
+Tree Models from Genetic Algorithms:
+```{r, echo = FALSE}
+set.seed(810148)
+
+evtree_model <- train(Survived ~ ., method = "evtree", preProcess = c("knnImpute", "scale", "center"), data = clean_training, na.action = na.pass)
+```
+
+Neural Network:
+```{r, echo = FALSE}
+set.seed(19417)
+
+nnet_model <- train(Survived ~ ., method = "nnet", preProcess = c("knnImpute", "scale", "center"), data = clean_training, na.action = na.pass)
+```
+
+Tree Augmented Naive Bayes:
+```{r, echo = FALSE}
+set.seed(58276)
+
+tan_model <- train(Survived ~ ., method = "tan", preProcess = c("knnImpute", "scale", "center"), data = clean_training, na.action = na.pass)
+```
+
+Stacked Model (using a Random Forest):
+```{r, echo = FALSE}
+set.seed(636098)
+
+create_stacked_df <- function(data) {
+  rf_pred <- predict(rf_model, data, na.action = na.pass)
+  gbm_pred <- predict(gbm_model, data, na.action = na.pass)
+  svmlinear_pred <- predict(svmlinear_model, data, na.action = na.pass)
+  svmradial_pred <- predict(svmradial_model, data, na.action = na.pass)
+  logit_pred <- predict(logit_model, data, na.action = na.pass)
+  lda_pred <- predict(lda_model, data, na.action = na.pass)
+  adabag_pred <- predict(adabag_model, data, na.action = na.pass)
+  gam_pred <- predict(gam_model, data, na.action = na.pass)
+  evtree_pred <- predict(evtree_model, data, na.action = na.pass)
+  nnet_pred <- predict(nnet_model, data, na.action = na.pass)
+  tan_pred <- predict(tan_model, data, na.action = na.pass)
+  
+  stacked <- tibble(rf_pred, gbm_pred, svmlinear_pred, svmradial_pred, logit_pred, lda_pred,
+                    adabag_pred, gam_pred, evtree_pred, nnet_pred, tan_pred)
+  return(stacked)
+} 
+
+stacked_training <- bind_cols(create_stacked_df(clean_training), tibble(Survived = clean_training$Survived))
+stacked_model <- train(Survived ~ ., method = "rf", data = stacked_training)
+stacked_predictions <- predict(stacked_model, create_stacked_df(clean_testing), na.action = na.pass)
+```

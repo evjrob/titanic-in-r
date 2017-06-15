@@ -493,4 +493,10 @@ create_stacked_df <- function(data) {
 stacked_training <- bind_cols(create_stacked_df(clean_training), tibble(Survived = clean_training$Survived))
 stacked_model <- train(Survived ~ ., method = "rf", data = stacked_training)
 stacked_predictions <- predict(stacked_model, create_stacked_df(clean_testing), na.action = na.pass)
+
+
+submission <- bind_cols(testing$PassengerId, tibble(stacked_predictions)) 
+names(submission) <- c("PassengerId", "Survived")
+write_csv(submission, "submission.csv")
 ```
+

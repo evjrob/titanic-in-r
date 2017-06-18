@@ -373,22 +373,27 @@ drop_features <- function(data) {
 names(drop_features(engineer_features(training)))
 ```
 
-I have ignored a lot of other common preprocessing steps while cleaning the data and engineering additional features. This is because the caret package takes care of a lot of the necessary preprocessing steps such as dummy variable creation, scaling, centering, and principal components analysis.
-
-###Model Training
-
 We will start by applying the previous data cleaning and feature engineering steps to the training and test data sets.
 ```{r}
 clean_training <- drop_features(engineer_features(training))
-clean_training$Survived <- factor(clean_training$Survived) # Convert Survied to a factor so that the predictions are discrete.
+clean_training$Survived <- factor(clean_training$Survived) # Convert Survived to a factor so that the predictions are discrete.
 clean_testing <- drop_features(engineer_features(testing))
 ```
+
+```{r}
+clean_training_preProc <- preProcess(clean_training, method = c("knnImpute", "pca"))
+clean_training_imp <- predict(clean_training_preProc, clean_training)
+
+clean_testing_imp <- predict(clean_training_preProc, clean_testing)
+```
+
+###Model Training
 
 Random Forest:
 ```{r, echo = FALSE}
 set.seed(763622)
 
-rf_model <- train(Survived ~ ., method = "rf", preProcess = c("knnImpute"), data = clean_training, na.action = na.pass)
+rf_model <- train(Survived ~ ., method = "rf", tuneLength = 10, data = clean_training_imp)
 ```
 
 Gradient Boosting:

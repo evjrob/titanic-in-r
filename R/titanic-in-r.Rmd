@@ -461,11 +461,11 @@ set.seed(19417)
 nnet_model <- train(Survived ~ ., method = "nnet", preProcess = c("knnImpute", "scale", "center"), data = clean_training, na.action = na.pass)
 ```
 
-Tree Augmented Naive Bayes:
+Naive Bayes:
 ```{r, echo = FALSE}
 set.seed(58276)
 
-tan_model <- train(Survived ~ ., method = "tan", preProcess = c("knnImpute", "scale", "center"), data = clean_training, na.action = na.pass)
+nb_model <- train(Survived ~ ., method = "nb", preProcess = c("knnImpute", "scale", "center"), data = clean_training, na.action = na.pass)
 ```
 
 Stacked Model (using a Random Forest):
@@ -483,10 +483,10 @@ create_stacked_df <- function(data) {
   gam_pred <- predict(gam_model, data, na.action = na.pass)
   evtree_pred <- predict(evtree_model, data, na.action = na.pass)
   nnet_pred <- predict(nnet_model, data, na.action = na.pass)
-  tan_pred <- predict(tan_model, data, na.action = na.pass)
+  nb_pred <- predict(nb_model, data, na.action = na.pass)
   
   stacked <- tibble(rf_pred, gbm_pred, svmlinear_pred, svmradial_pred, logit_pred, lda_pred,
-                    adabag_pred, gam_pred, evtree_pred, nnet_pred, tan_pred)
+                    adabag_pred, gam_pred, evtree_pred, nnet_pred, nb_pred)
   return(stacked)
 } 
 
@@ -495,8 +495,7 @@ stacked_model <- train(Survived ~ ., method = "rf", data = stacked_training)
 stacked_predictions <- predict(stacked_model, create_stacked_df(clean_testing), na.action = na.pass)
 
 
-submission <- bind_cols(testing$PassengerId, tibble(stacked_predictions)) 
-names(submission) <- c("PassengerId", "Survived")
+submission <- tibble(PassengerId = testing$PassengerId, Survived = stacked_predictions)
 write_csv(submission, "submission.csv")
 ```
 

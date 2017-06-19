@@ -11,6 +11,7 @@ knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(stringr)
 library(caret)
+library(doParallel)
 ```
 
 ## Titanic in R
@@ -194,6 +195,7 @@ simplify_titles <- function(data) {
     "Capt.", "Ranked",
     "Col.", "Ranked",
     "Don.", "Nobility",
+    "Dona.", "Nobility",
     "Dr.", "Professional",
     "Jonkheer.", "Nobility",
     "Lady.", "Nobility",
@@ -382,125 +384,90 @@ clean_testing <- drop_features(engineer_features(testing))
 
 ```{r}
 clean_training_preProc <- preProcess(clean_training, method = c("knnImpute", "pca"))
-clean_training_imp <- predict(clean_training_preProc, clean_training)
+clean_training <- predict(clean_training_preProc, clean_training)
 
-clean_testing_imp <- predict(clean_training_preProc, clean_testing)
+clean_testing <- predict(clean_training_preProc, clean_testing)
 ```
 
 ###Model Training
+
+
+We will set up a cluster to parallelize the training steps for performance reasons
+```{r}
+cl <- makeCluster(detectCores())
+registerDoParallel(cl)
+```
 
 Random Forest:
 ```{r, echo = FALSE}
 set.seed(763622)
 
-rf_model <- train(Survived ~ ., method = "rf", tuneLength = 10, data = clean_training_imp)
+rf_model <- train(Survived ~ ., method = "rf", tuneLength = 10, data = clean_training)
 ```
 
 Gradient Boosting:
 ```{r, echo = FALSE}
 set.seed(503878)
 
-gbm_model <- train(Survived ~ ., method = "gbm", preProcess = c("knnImpute"), data = clean_training, na.action = na.pass)
-```
-
-SVM Linear with Class Weights:
-```{r, echo = FALSE}
-set.seed(248369)
-
-svmlinear_model <- train(Survived ~ ., method = "svmLinearWeights", preProcess = c("knnImpute", "scale", "center"), data = clean_training, na.action = na.pass)
+gbm_model <- train(Survived ~ ., method = "gbm", tuneLength = 5, data = clean_training)
 ```
 
 SVM Radial with Class Weights:
 ```{r, echo = FALSE}
 set.seed(227837)
 
-svmradial_model <- train(Survived ~ ., method = "svmRadialWeights", preProcess = c("knnImpute", "scale", "center"), data = clean_training, na.action = na.pass)
-```
-
-Logistic Regression:
-```{r, echo = FALSE}
-set.seed(77168)
-
-logit_model <- train(Survived ~ ., method = "LogitBoost", preProcess = c("knnImpute", "scale", "center"), data = clean_training, na.action = na.pass)
-```
-
-Linear Discriminant Analysis:
-```{r, echo = FALSE}
-set.seed(304699)
-
-lda_model <- train(Survived ~ ., method = "lda", preProcess = c("knnImpute", "scale", "center"), data = clean_training, na.action = na.pass)
+svmradial_model <- train(Survived ~ ., method = "svmRadialWeights", tuneLength = 5, data = clean_training)
 ```
 
 Bagged AdaBoost:
 ```{r, echo = FALSE}
 set.seed(451039)
 
-adabag_model <- train(Survived ~ ., method = "AdaBag", preProcess = c("knnImpute", "scale", "center"), data = clean_training, na.action = na.pass)
-```
-
-Generalized Additive Model:
-```{r, echo = FALSE}
-set.seed(832176)
-
-gam_model <- train(Survived ~ ., method = "gam", preProcess = c("knnImpute", "scale", "center"), data = clean_training, na.action = na.pass)
+adabag_model <- train(Survived ~ ., method = "AdaBag", tuneLength = 5, data = clean_training)
 ```
 
 Tree Models from Genetic Algorithms:
 ```{r, echo = FALSE}
 set.seed(810148)
 
-evtree_model <- train(Survived ~ ., method = "evtree", preProcess = c("knnImpute", "scale", "center"), data = clean_training, na.action = na.pass)
-```
-
-Tree Models from Genetic Algorithms:
-```{r, echo = FALSE}
-set.seed(810148)
-
-evtree_model <- train(Survived ~ ., method = "evtree", preProcess = c("knnImpute", "scale", "center"), data = clean_training, na.action = na.pass)
+evtree_model <- train(Survived ~ ., method = "evtree", tuneLength = 5, data = clean_training)
 ```
 
 Neural Network:
 ```{r, echo = FALSE}
 set.seed(19417)
 
-nnet_model <- train(Survived ~ ., method = "nnet", preProcess = c("knnImpute", "scale", "center"), data = clean_training, na.action = na.pass)
+nnet_model <- train(Survived ~ ., method = "nnet", tuneLength = 5, data = clean_training)
 ```
 
-Naive Bayes:
+Penalized Logistic Regression:
 ```{r, echo = FALSE}
 set.seed(58276)
 
-nb_model <- train(Survived ~ ., method = "nb", preProcess = c("knnImpute", "scale", "center"), data = clean_training, na.action = na.pass)
+plr_model <- train(Survived ~ ., method = "plr", tuneLength = 5, data = clean_training)
 ```
 
-Stacked Model (using a Random Forest):
+Stacked Model (Majority Wins):
 ```{r, echo = FALSE}
 set.seed(636098)
 
 create_stacked_df <- function(data) {
-  rf_pred <- predict(rf_model, data, na.action = na.pass)
-  gbm_pred <- predict(gbm_model, data, na.action = na.pass)
-  svmlinear_pred <- predict(svmlinear_model, data, na.action = na.pass)
-  svmradial_pred <- predict(svmradial_model, data, na.action = na.pass)
-  logit_pred <- predict(logit_model, data, na.action = na.pass)
-  lda_pred <- predict(lda_model, data, na.action = na.pass)
-  adabag_pred <- predict(adabag_model, data, na.action = na.pass)
-  gam_pred <- predict(gam_model, data, na.action = na.pass)
-  evtree_pred <- predict(evtree_model, data, na.action = na.pass)
-  nnet_pred <- predict(nnet_model, data, na.action = na.pass)
-  nb_pred <- predict(nb_model, data, na.action = na.pass)
+  rf_pred <- predict(rf_model, data)
+  gbm_pred <- predict(gbm_model, data)
+  svmradial_pred <- predict(svmradial_model, data)
+  adabag_pred <- predict(adabag_model, data)
+  evtree_pred <- predict(evtree_model, data)
+  nnet_pred <- predict(nnet_model, data)
+  plr_pred <- predict(plr_model, data)
   
-  stacked <- tibble(rf_pred, gbm_pred, svmlinear_pred, svmradial_pred, logit_pred, lda_pred,
-                    adabag_pred, gam_pred, evtree_pred, nnet_pred, nb_pred)
+  stacked <- tibble(rf_pred, gbm_pred, svmradial_pred, adabag_pred, evtree_pred, nnet_pred, plr_pred)
   return(stacked)
-} 
+}
 
-stacked_training <- bind_cols(create_stacked_df(clean_training), tibble(Survived = clean_training$Survived))
-stacked_model <- train(Survived ~ ., method = "rf", data = stacked_training)
-stacked_predictions <- predict(stacked_model, create_stacked_df(clean_testing), na.action = na.pass)
+# Any sum higher than a 3 means a majority of the seven models predicted survival.
+stacked_predictions <- create_stacked_df(clean_testing) %>% transmute(Survived = as.numeric(rowSums(. == 1) > 3))
 
-
-submission <- tibble(PassengerId = testing$PassengerId, Survived = stacked_predictions)
+submission <- tibble(PassengerId = testing$PassengerId, Survived = stacked_predictions$Survived)
 write_csv(submission, "submission.csv")
 ```
 
